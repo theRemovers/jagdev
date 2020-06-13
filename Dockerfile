@@ -14,6 +14,7 @@ RUN \
     fakeroot \
     gcc \
     git \
+    linux-headers \
     make \
     nano \
     ocaml \
