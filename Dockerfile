@@ -84,6 +84,13 @@ USER root
 RUN \
   pacman -U --noconfirm m68k-atari-mint-gcc/m68k-atari-mint-gcc*.tar.xz
 
+COPY binfmt.conf /etc/modprobe.d/binfmt.conf
+COPY 90-local.rules /etc/udev/rules.d/90-local.rules
+COPY 98-buspirate.rules /etc/udev/rules.d/98-buspirate.rules
+
+RUN \
+  gpasswd -a ${USERNAME} uucp
+
 USER ${USERNAME}
 
 RUN mkdir -p -m 0700 .ssh && \
