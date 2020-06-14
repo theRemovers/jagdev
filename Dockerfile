@@ -9,6 +9,7 @@ RUN \
     bash-completion \
     curl \
     diffutils \
+    doxygen \
     dkms \
     emacs \
     fakeroot \
