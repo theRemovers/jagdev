@@ -117,8 +117,6 @@ RUN \
   make && \
   ln -s /home/${USERNAME}/jlinker/jlinker.native /home/${USERNAME}/bin/aln
 
-USER ${USERNAME}
-
 RUN \
   git clone https://github.com/theRemovers/skunk_jcp && \
   cd skunk_jcp/jcp && \
