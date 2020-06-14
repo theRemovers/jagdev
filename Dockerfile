@@ -48,9 +48,19 @@ RUN \
     --password "$(openssl passwd -1 archlinux)" \
     ${USERNAME}
 
+COPY binfmt.conf /etc/modprobe.d/binfmt.conf
+COPY 90-local.rules /etc/udev/rules.d/90-local.rules
+COPY 98-buspirate.rules /etc/udev/rules.d/98-buspirate.rules
+
+RUN gpasswd -a ${USERNAME} uucp
+
 WORKDIR /home/${USERNAME}
 
 USER ${USERNAME}
+
+RUN mkdir pkg
+
+WORKDIR /home/${USERNAME}/pkg
 
 RUN \
   git clone https://aur.archlinux.org/ia32_aout-dkms.git && \
@@ -86,12 +96,7 @@ USER root
 RUN \
   pacman -U --noconfirm m68k-atari-mint-gcc/m68k-atari-mint-gcc*.tar.xz
 
-COPY binfmt.conf /etc/modprobe.d/binfmt.conf
-COPY 90-local.rules /etc/udev/rules.d/90-local.rules
-COPY 98-buspirate.rules /etc/udev/rules.d/98-buspirate.rules
-
-RUN \
-  gpasswd -a ${USERNAME} uucp
+WORKDIR /home/${USERNAME}
 
 RUN mkdir -p bin
 COPY mac bin/mac
