@@ -98,8 +98,11 @@ RUN \
 
 WORKDIR /home/${USERNAME}
 
+USER ${USERNAME}
 RUN mkdir -p bin
 COPY mac bin/mac
+
+USER root
 RUN chown root:${GROUPNAME} bin/mac && chmod u+s bin/mac
 
 USER ${USERNAME}
