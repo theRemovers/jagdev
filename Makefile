@@ -35,7 +35,7 @@ all: help
 
 run: build
 	xhost +local:
-	$(DOCKER) run --rm -t -i -v $(SSH_AUTH_SOCK):/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent -e DISPLAY=$(DISPLAY) $(VOLUMES) $(HOSTS) $(NAME) /bin/bash
+	$(DOCKER) run --rm --privileged -t -i -v $(SSH_AUTH_SOCK):/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent -e DISPLAY=$(DISPLAY) $(VOLUMES) $(HOSTS) $(NAME) /bin/bash
 	xhost -local:
 
 build: Dockerfile

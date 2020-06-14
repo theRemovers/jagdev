@@ -92,6 +92,10 @@ COPY 98-buspirate.rules /etc/udev/rules.d/98-buspirate.rules
 RUN \
   gpasswd -a ${USERNAME} uucp
 
+RUN mkdir -p bin
+COPY mac bin/mac
+RUN chown root:${GROUPNAME} bin/mac && chmod u+s bin/mac
+
 USER ${USERNAME}
 
 RUN mkdir -p -m 0700 .ssh && \
