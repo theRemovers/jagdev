@@ -15,6 +15,7 @@ RUN \
     fakeroot \
     gcc \
     git \
+    libusb-compat \
     linux-headers \
     make \
     nano \
@@ -110,8 +111,24 @@ USER ${USERNAME}
 RUN mkdir -p -m 0700 .ssh && \
   ssh-keyscan github.com > .ssh/known_hosts
 
+RUN \
+  git clone https://github.com/theRemovers/jlinker.git && \
+  cd jlinker && \
+  make && \
+  ln -s /home/${USERNAME}/jlinker/jlinker.native /home/${USERNAME}/bin/aln
+
+USER ${USERNAME}
+
+RUN \
+  git clone https://github.com/theRemovers/skunk_jcp && \
+  cd skunk_jcp/jcp && \
+  make && \
+  ln -s /home/${USERNAME}/skunk_jcp/jcp/jcp /home/${USERNAME}/bin/jcp
+
 COPY .bash.alias .
 
 RUN echo "if [ -f ${HOME}/.bash.alias ]; then . ${HOME}/.bash.alias; fi" >> .bashrc
 
 RUN echo "export JAGPATH=${HOME}" >> .bashrc
+
+RUN echo "cd lib && ./setup.sh && cd .." >> .bashrc
