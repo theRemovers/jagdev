@@ -107,3 +107,8 @@ USER ${USERNAME}
 RUN mkdir -p -m 0700 .ssh && \
   ssh-keyscan github.com > .ssh/known_hosts
 
+COPY .bash.alias .
+
+RUN echo "if [ -f ${HOME}/.bash.alias ]; then . ${HOME}/.bash.alias; fi" >> .bashrc
+
+RUN echo "export JAGPATH=${HOME}" >> .bashrc
