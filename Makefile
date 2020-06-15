@@ -23,8 +23,9 @@ BUILDARGS+=--build-arg GROUPID=$(GROUPID)
 BUILDARGS+=--build-arg VERSION=$(VERSION)
 
 VOLUMES=
-VOLUMES+=-v $(PWD)/src:/home/$(USERNAME)/src:Z
 VOLUMES+=-v $(PWD)/lib:/home/$(USERNAME)/lib:Z
+VOLUMES+=-v $(PWD)/src:/home/$(USERNAME)/src:Z
+#VOLUMES+=-v $(PWD)/lib:/home/$(USERNAME)/lib:Z
 VOLUMES+=-v $(HOME)/.emacs:/home/$(USERNAME)/.emacs:Z
 VOLUMES+=-v /tmp/.X11-unix:/tmp/.X11-unix:Z
 

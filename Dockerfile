@@ -102,14 +102,21 @@ WORKDIR /home/${USERNAME}
 USER ${USERNAME}
 RUN mkdir -p bin
 COPY mac bin/mac
-
 USER root
 RUN chown root:${GROUPNAME} bin/mac && chmod u+s bin/mac
-
 USER ${USERNAME}
 
 RUN mkdir -p -m 0700 .ssh && \
   ssh-keyscan github.com > .ssh/known_hosts
+
+COPY .bash.alias .
+USER root
+RUN chown ${USERNAME}:${GROUPNAME} .bash.alias
+USER ${USERNAME}
+
+RUN echo "if [ -f ${HOME}/.bash.alias ]; then . ${HOME}/.bash.alias; fi" >> .bashrc
+
+RUN echo "export JAGPATH=${HOME}" >> .bashrc
 
 RUN \
   git clone https://github.com/theRemovers/jlinker.git && \
@@ -123,10 +130,8 @@ RUN \
   make && \
   ln -s /home/${USERNAME}/skunk_jcp/jcp/jcp /home/${USERNAME}/bin/jcp
 
-COPY .bash.alias .
-
-RUN echo "if [ -f ${HOME}/.bash.alias ]; then . ${HOME}/.bash.alias; fi" >> .bashrc
-
-RUN echo "export JAGPATH=${HOME}" >> .bashrc
-
-RUN echo "cd lib && ./setup.sh && cd .." >> .bashrc
+COPY setup.sh setup.sh
+USER root
+RUN chown ${USERNAME}:${GROUPNAME} setup.sh
+USER ${USERNAME}
+RUN echo "./setup.sh" >> .bashrc
