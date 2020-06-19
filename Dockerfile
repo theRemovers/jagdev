@@ -130,6 +130,13 @@ RUN \
   make && \
   ln -s /home/${USERNAME}/skunk_jcp/jcp/jcp /home/${USERNAME}/bin/jcp
 
+RUN \
+  mkdir -p lib
+
+RUN \
+  git clone https://github.com/theRemovers/jlibc && \
+  git clone https://github.com/theRemovers/rmvlib
+
 COPY setup.sh setup.sh
 USER root
 RUN chown ${USERNAME}:${GROUPNAME} setup.sh
