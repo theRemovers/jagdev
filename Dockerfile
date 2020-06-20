@@ -134,6 +134,10 @@ RUN \
   ln -s /home/${USERNAME}/skunk_jcp/jcp/jcp /home/${USERNAME}/bin/jcp
 
 RUN \
+  git clone https://github.com/theRemovers/jconverter && \
+  ln -s /home/${USERNAME}/jconverter/converter.py /home/${USERNAME}/bin/converter
+
+RUN \
   mkdir -p lib
 
 RUN \
