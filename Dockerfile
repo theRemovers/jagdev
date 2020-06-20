@@ -21,6 +21,9 @@ RUN \
     nano \
     ocaml \
     openssh \
+    python3 \
+    python-numpy \
+    python-pillow \
     rsync \
     sudo \
     unzip \
