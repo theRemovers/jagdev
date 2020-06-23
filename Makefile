@@ -27,9 +27,12 @@ ENV=
 VOLUMES=
 VOLUMES+=-v $(PWD)/src:/home/$(USERNAME)/src:Z
 VOLUMES+=-v $(HOME)/.emacs:/home/$(USERNAME)/.emacs:Z
+ifneq ($(DISPLAY),)
 VOLUMES+=-v /tmp/.X11-unix:/tmp/.X11-unix:Z
+ENV+=-e DISPLAY=$(DISPLAY)
+endif
 ifneq ($(SSH_AUTH_SOCK),)
-VOLUMES+=-v $(SSH_AUTH_SOCK):/ssh-agent
+VOLUMES+=-v $(SSH_AUTH_SOCK):/ssh-agent:Z
 ENV+=-e SSH_AUTH_SOCK=/ssh-agent
 BUILDARGS+=--ssh default
 endif
@@ -43,7 +46,7 @@ all: help
 
 run: build
 	xhost +local: || true
-	$(DOCKER) run --rm --privileged -t -i -e DISPLAY=$(DISPLAY) $(VOLUMES) $(ENV) $(HOSTS) $(NAME) /bin/bash
+	$(DOCKER) run --rm --privileged -t -i $(VOLUMES) $(ENV) $(HOSTS) $(NAME) /bin/bash
 	xhost -local: || true
 
 build: Dockerfile
