@@ -4,8 +4,8 @@ else
 DOCKER=docker
 endif
 
-VERSION=latest
-NAME=jagdev-$(VERSION)
+VERSION?=latest
+IMGNAME?=jagdev-$(VERSION)
 
 USERNAME=$(shell id -un)
 USERID=$(shell id -u)
@@ -48,11 +48,11 @@ all: help
 
 run: build
 	xhost +local: || true
-	$(DOCKER) run --rm --privileged -t -i $(VOLUMES) $(ENV) $(HOSTS) $(NAME) /bin/bash
+	$(DOCKER) run --rm --privileged -t -i $(VOLUMES) $(ENV) $(HOSTS) $(IMGNAME) /bin/bash
 	xhost -local: || true
 
 build: Dockerfile
-	DOCKER_BUILDKIT=1 $(DOCKER) build -t $(NAME) $(BUILDARGS) .
+	DOCKER_BUILDKIT=1 $(DOCKER) build -t $(IMGNAME) $(BUILDARGS) .
 
 help:
 	@echo "Provide an archlinux development environment using Docker"
