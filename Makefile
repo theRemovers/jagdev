@@ -26,7 +26,9 @@ ENV=
 
 VOLUMES=
 VOLUMES+=-v $(PWD)/src:/home/$(USERNAME)/src:Z
+ifeq ($(shell if test -e $(HOME)/.emacs; then echo "true"; else echo "false"; fi),true)
 VOLUMES+=-v $(HOME)/.emacs:/home/$(USERNAME)/.emacs:Z
+endif
 ifneq ($(DISPLAY),)
 VOLUMES+=-v /tmp/.X11-unix:/tmp/.X11-unix:Z
 ENV+=-e DISPLAY=$(DISPLAY)
