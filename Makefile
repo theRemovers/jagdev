@@ -4,8 +4,8 @@ else
 DOCKER=docker
 endif
 
-VERSION?=latest
-NAME?=jagdev-$(VERSION)
+VERSION=latest
+NAME=jagdev-$(VERSION)
 
 USERNAME=$(shell id -un)
 USERID=$(shell id -u)
