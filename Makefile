@@ -22,10 +22,17 @@ BUILDARGS+=--build-arg GROUPNAME=$(GROUPNAME)
 BUILDARGS+=--build-arg GROUPID=$(GROUPID)
 BUILDARGS+=--build-arg VERSION=$(VERSION)
 
+ENV=
+
 VOLUMES=
 VOLUMES+=-v $(PWD)/src:/home/$(USERNAME)/src:Z
 VOLUMES+=-v $(HOME)/.emacs:/home/$(USERNAME)/.emacs:Z
 VOLUMES+=-v /tmp/.X11-unix:/tmp/.X11-unix:Z
+ifneq ($(SSH_AUTH_SOCK),)
+VOLUMES+=-v $(SSH_AUTH_SOCK):/ssh-agent
+ENV+=-e SSH_AUTH_SOCK=/ssh-agent
+BUILDARGS+=--ssh default
+endif
 
 HOSTS=
 #HOSTS+=--add-host xx:yy
@@ -35,12 +42,12 @@ HOSTS=
 all: help
 
 run: build
-	xhost +local:
-	$(DOCKER) run --rm --privileged -t -i -v $(SSH_AUTH_SOCK):/ssh-agent -e SSH_AUTH_SOCK=/ssh-agent -e DISPLAY=$(DISPLAY) $(VOLUMES) $(HOSTS) $(NAME) /bin/bash
-	xhost -local:
+	xhost +local: || true
+	$(DOCKER) run --rm --privileged -t -i -e DISPLAY=$(DISPLAY) $(VOLUMES) $(ENV) $(HOSTS) $(NAME) /bin/bash
+	xhost -local: || true
 
 build: Dockerfile
-	DOCKER_BUILDKIT=1 $(DOCKER) build -t $(NAME) $(BUILDARGS) --ssh default .
+	DOCKER_BUILDKIT=1 $(DOCKER) build -t $(NAME) $(BUILDARGS) .
 
 help:
 	@echo "Provide an archlinux development environment using Docker"
