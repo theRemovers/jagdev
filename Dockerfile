@@ -74,7 +74,7 @@ RUN \
 USER root
 
 RUN \
-  pacman -U --noconfirm ia32_aout-dkms/ia32_aout-dkms*.tar.xz
+  pacman -U --noconfirm ia32_aout-dkms/ia32_aout-dkms*.tar.zst
 
 USER ${USERNAME}
 
@@ -86,7 +86,7 @@ RUN \
 USER root
 
 RUN \
-  pacman -U --noconfirm m68k-atari-mint-binutils/m68k-atari-mint-binutils*.tar.xz
+  pacman -U --noconfirm m68k-atari-mint-binutils/m68k-atari-mint-binutils*.tar.zst
 
 USER ${USERNAME}
 
@@ -98,7 +98,7 @@ RUN \
 USER root
 
 RUN \
-  pacman -U --noconfirm m68k-atari-mint-gcc/m68k-atari-mint-gcc*.tar.xz
+  pacman -U --noconfirm m68k-atari-mint-gcc/m68k-atari-mint-gcc*.tar.zst
 
 WORKDIR /home/${USERNAME}
 
