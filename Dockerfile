@@ -52,7 +52,6 @@ RUN \
     --password "$(openssl passwd -1 archlinux)" \
     ${USERNAME}
 
-COPY binfmt.conf /etc/modprobe.d/binfmt.conf
 COPY 90-local.rules /etc/udev/rules.d/90-local.rules
 COPY 98-buspirate.rules /etc/udev/rules.d/98-buspirate.rules
 
@@ -65,18 +64,6 @@ USER ${USERNAME}
 RUN mkdir pkg
 
 WORKDIR /home/${USERNAME}/pkg
-
-RUN \
-  git clone https://aur.archlinux.org/ia32_aout-dkms.git && \
-  cd ia32_aout-dkms && \
-  makepkg -f
-
-USER root
-
-RUN \
-  pacman -U --noconfirm ia32_aout-dkms/ia32_aout-dkms*.tar.zst
-
-USER ${USERNAME}
 
 RUN \
   git clone https://aur.archlinux.org/m68k-atari-mint-binutils.git && \
@@ -104,10 +91,6 @@ WORKDIR /home/${USERNAME}
 
 USER ${USERNAME}
 RUN mkdir -p bin
-COPY mac bin/mac
-USER root
-RUN chown root:${GROUPNAME} bin/mac && chmod u+s bin/mac
-USER ${USERNAME}
 
 RUN mkdir -p -m 0700 .ssh && \
   ssh-keyscan github.com > .ssh/known_hosts
@@ -136,6 +119,17 @@ RUN \
 RUN \
   git clone https://github.com/theRemovers/jconverter && \
   ln -s /home/${USERNAME}/jconverter/converter.py /home/${USERNAME}/bin/converter
+
+RUN \
+  git clone http://shamusworld.gotdns.org/git/rmac
+
+COPY rmac.patch rmac
+
+RUN \
+  cd rmac && \
+  git apply rmac.patch && \
+  make && \
+  ln -s /home/${USERNAME}/rmac/rmac /home/${USERNAME}/bin/mac
 
 RUN \
   mkdir -p lib

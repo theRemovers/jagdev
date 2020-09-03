@@ -1,0 +1,474 @@
+From 4110831199e8e85201322ed30c5d98f0b6bf31f5 Mon Sep 17 00:00:00 2001
+From: ggn <ggn.dbug@gmail.com>
+Date: Tue, 1 Sep 2020 09:44:56 +0300
+Subject: [PATCH] Fix for bug #173 - expressions that contain "*" are treated
+ as absolute when ORG is active. Also small cleanup of expr.c and doc update
+
+---
+ docs/rmac.rst | 20 +++++++--------
+ expr.c        | 71 ++++++++-------------------------------------------
+ object.c      | 18 +++++++++++++
+ rmac.c        |  2 +-
+ 4 files changed, 40 insertions(+), 71 deletions(-)
+
+diff --git a/docs/rmac.rst b/docs/rmac.rst
+index a562e85..bfbd66c 100644
+--- a/docs/rmac.rst
++++ b/docs/rmac.rst
+@@ -4,7 +4,7 @@ RMAC
+ =====================
+ Reference Manual
+ ================
+-version 2.0.18
++version 2.0.21
+ ==============
+ 
+ © and notes
+@@ -154,8 +154,8 @@ Switch               Description
+ 
+                       -o\ *file[.o]*       Direct object code output to the specified file.
+ +/~oall              Turn all optimisations on/off
+-+o\ *0-9*            Enable specific optimisation
+-~o\ *0-9*            Disable specific optimisation
+++o\ *0-10*/*p*       Enable specific optimisation
++~o\ *0-10*/*p*       Disable specific optimisation
+ 
+                       `0: Absolute long adddresses to word (on by default)`
+                       
+@@ -177,7 +177,7 @@ Switch               Description
+ 
+                       `9: Convert adda.w/l #x,Dy to lea x(Dy),Dy`
+ 
+-                      'p: Enforce PC relative'
++                      `p: Force PC-Relative mode (alternative: o10)`
+ -p                   Produce an executable (**.prg**) output file.
+ -ps                  Produce an executable (**.prg**) output file with symbols.
+ -px                  Produce an executable (**.prg**) output file with extended symbols.
+@@ -803,7 +803,7 @@ Operator                            Description
+ **~**                               Tilde: bitwise not (l's complement).
+ **^^defined** *symbol*              True if symbol has a value.
+ **^^referenced** *symbol*           True if symbol has been referenced.
+-**^^streq** *stringl*,*string2*     True if the strings are equal.
++**^^streq** *stringl*, *string2*    True if the strings are equal.
+ **^^macdef** *macroName*            True if the macro is defined.
+ **^^abscount**                      Returns the size of current .abs section
+ **^^filesize** *string_filename*    Returns the file size of supplied filename
+@@ -2088,7 +2088,7 @@ indicates that the assembler could not determine which file had the problem.
+ The following sections list warnings, errors and fatal errors in alphabetical
+ order, along with a short description of what may have caused the problem.
+ 
+-.. [3] If you come across an internal error, we would appreciate it if you would contact Atari Technical Support and let us know about the problem.
++.. [3] If you come across an internal error, we would appreciate it if you would contact the rmac development team and let us know about the problem.
+ 
+ `Warnings`_
+ '''''''''''
+@@ -2406,13 +2406,13 @@ order, along with a short description of what may have caused the problem.
+ 
+ **unknown symbol following ^^**
+ 
+-  You followed a ^^ with something other than one of the names defined, ref-
+-  erenced or streq.
++  You followed a ^^ with something other than one of the names defined, referenced
++  or streq.
+ 
+ **unsupported 68020 addressing mode**
+ 
+-  The assembler saw a 68020-type addressing mode. RMAC does not assem-
+-  ble code for the 68020 or 68010.
++  The assembler saw a 68020-type addressing mode. RMAC does not assemble
++  code for the 68020 or 68010.
+ 
+ **unterminated string**
+ 
+diff --git a/expr.c b/expr.c
+index dc0e22b..5852cbc 100644
+--- a/expr.c
++++ b/expr.c
+@@ -348,7 +348,7 @@ int expr2(void)
+ 	case '$':
+ 		*evalTokenBuffer.u32++ = ACONST;			// Attributed const
+ 		*evalTokenBuffer.u32++ = sloc;				// Current location
+-		*evalTokenBuffer.u32++ = cursect | DEFINED;	// Store attribs
++		*evalTokenBuffer.u32++ = DEFINED | ((orgactive | org68k_active) ? 0 : cursect);		// Store attribs
+ 		break;
+ 	case '*':
+ 		*evalTokenBuffer.u32++ = ACONST;			// Attributed const
+@@ -356,7 +356,8 @@ int expr2(void)
+ 		// pcloc == location at start of line
+ 		*evalTokenBuffer.u32++ = (orgactive ? orgaddr : pcloc);
+ 		// '*' takes attributes of current section, not ABS!
+-		*evalTokenBuffer.u32++ = cursect | DEFINED;
++		// Also, if we're ORG'd, the symbol is absolute
++		*evalTokenBuffer.u32++ = DEFINED | ((orgactive | org68k_active) ? 0 : cursect);
+ 		break;
+ 	default:
+ 		return error("bad expression");
+@@ -384,23 +385,12 @@ int expr(TOKEN * otk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 							// Also set in various other places too (riscasm.c,
+ 							// e.g.)
+ 
+-//printf("expr(): tokens 0-2: %i %i %i (%c %c %c); tc[2] = %i\n", tok[0], tok[1], tok[2], tok[0], tok[1], tok[2], tokenClass[tok[2]]);
+ 	// Optimize for single constant or single symbol.
+ 	// Shamus: Subtle bug here. EOL token is 101; if you have a constant token
+ 	//         followed by the value 101, it will trigger a bad evaluation here.
+ 	//         This is probably a really bad assumption to be making here...!
+ 	//         (assuming tok[1] == EOL is a single token that is)
+ 	//         Seems that even other tokens (SUNARY type) can fuck this up too.
+-#if 0
+-//	if ((tok[1] == EOL)
+-	if ((tok[1] == EOL && ((tok[0] != CONST || tok[0] != FCONST) && tokenClass[tok[0]] != SUNARY))
+-//		|| (((*tok == CONST || *tok == FCONST || *tok == SYMBOL) || (*tok >= KW_R0 && *tok <= KW_R31))
+-//		&& (tokenClass[tok[2]] < UNARY)))
+-		|| (((tok[0] == SYMBOL) || (tok[0] >= KW_R0 && tok[0] <= KW_R31))
+-			&& (tokenClass[tok[2]] < UNARY))
+-		|| ((tok[0] == CONST || tok[0] == FCONST) && (tokenClass[tok[3]] < UNARY))
+-		)
+-#else
+ // Shamus: Seems to me that this could be greatly simplified by 1st checking if the first token is a multibyte token, *then* checking if there's an EOL after it depending on the actual length of the token (multiple vs. single). Otherwise, we have the horror show that is the following:
+ 	if ((tok[1] == EOL
+ 			&& (tok[0] != CONST && tokenClass[tok[0]] != SUNARY))
+@@ -410,7 +400,6 @@ int expr(TOKEN * otk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 		|| ((tok[0] == CONST) && (tokenClass[tok[3]] < UNARY))
+ 		)
+ // Shamus: Yes, you can parse that out and make some kind of sense of it, but damn, it takes a while to get it and understand the subtle bugs that result from not being careful about what you're checking; especially vis-a-vis niavely checking tok[1] for an EOL. O_o
+-#endif
+ 	{
+ 		if (*tok >= KW_R0 && *tok <= KW_R31)
+ 		{
+@@ -457,13 +446,18 @@ int expr(TOKEN * otk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 		{
+ 			*evalTokenBuffer.u32++ = CONST;
+ 
+-			if (orgactive)
++			if (orgactive | org68k_active)
++			{
+ 				*evalTokenBuffer.u64++ = *a_value = orgaddr;
++				*a_attr = DEFINED;	// We have ORG active, it doesn't belong in a section!
++			}
+ 			else
++			{
+ 				*evalTokenBuffer.u64++ = *a_value = pcloc;
++				// '*' takes attributes of current section, not ABS!
++				*a_attr = cursect | DEFINED;
++			}
+ 
+-			// '*' takes attributes of current section, not ABS!
+-			*a_attr = cursect | DEFINED;
+ 
+ 			if (a_esym != NULL)
+ 				*a_esym = NULL;
+@@ -475,11 +469,6 @@ int expr(TOKEN * otk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 			p = string[tok[1]];
+ 			j = (*p == '.' ? curenv : 0);
+ 			symbol = lookup(p, LABEL, j);
+-#if 0
+-printf("eval: Looking up symbol (%s) [=%08X]\n", p, symbol);
+-if (symbol)
+-	printf("      attr=%04X, attre=%08X, val=%i, name=%s\n", symbol->sattr, symbol->sattre, symbol->svalue, symbol->sname);
+-#endif
+ 
+ 			if (symbol == NULL)
+ 				symbol = NewSymbol(p, LABEL, j);
+@@ -589,7 +578,6 @@ int evexpr(TOKEN * _tk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 		switch ((int)*tk.u32++)
+ 		{
+ 		case SYMBOL:
+-//printf("evexpr(): SYMBOL\n");
+ 			sy = symbolPtr[*tk.u32++];
+ 			sy->sattr |= REFERENCED;		// Set "referenced" bit
+ 
+@@ -620,12 +608,10 @@ int evexpr(TOKEN * _tk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 
+ 		case CONST:
+ 			*++sval = *tk.u64++;
+-//printf("evexpr(): CONST = %lX\n", *sval);
+ 			*++sattr = ABS | DEFINED;		// Push simple attribs
+ 			break;
+ 
+ 		case FCONST:
+-//printf("evexpr(): FCONST = %lf\n", *tk.dp);
+ 			// Even though it's a double, we can treat it like a uint64_t since
+ 			// we're just moving the bits around.
+ 			*++sval = *tk.u64++;
+@@ -633,7 +619,6 @@ int evexpr(TOKEN * _tk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 			break;
+ 
+ 		case ACONST:
+-//printf("evexpr(): ACONST = %i\n", *tk.u32);
+ 			*++sval = *tk.u32++;				// Push value
+ 			*++sattr = (WORD)*tk.u32++;			// Push attribs
+ 			break;
+@@ -651,10 +636,8 @@ int evexpr(TOKEN * _tk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 			//       - : ABS
+ 
+ 		case '+':
+-//printf("evexpr(): +\n");
+ 			--sval;							// Pop value
+ 			--sattr;						// Pop attrib
+-//printf("--> N+N: %i + %i = ", *sval, sval[1]);
+ 			// Get FLOAT attribute, if any
+ 			attr = (sattr[0] | sattr[1]) & FLOAT;
+ 
+@@ -674,7 +657,6 @@ int evexpr(TOKEN * _tk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 			{
+ 				*sval += sval[1];				// Compute value
+ 			}
+-//printf("%i\n", *sval);
+ 
+ 			if (!(*sattr & TDB))
+ 				*sattr = sattr[1] | attr;
+@@ -684,10 +666,8 @@ int evexpr(TOKEN * _tk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 			break;
+ 
+ 		case '-':
+-//printf("evexpr(): -\n");
+ 			--sval;							// Pop value
+ 			--sattr;						// Pop attrib
+-//printf("--> N-N: %i - %i = ", *sval, sval[1]);
+ 			// Get FLOAT attribute, if any
+ 			attr = (sattr[0] | sattr[1]) & FLOAT;
+ 
+@@ -707,13 +687,9 @@ int evexpr(TOKEN * _tk, uint64_t * a_value, WORD * a_attr, SYM ** a_esym)
+ 			{
+ 				*sval -= sval[1];
+ 			}
+-//printf("%i\n", *sval);
+ 
+ 			*sattr |= attr;					// Inherit FLOAT attribute
+ 			attr = (WORD)(*sattr & TDB);
+-#if 0
+-printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+-#endif
+ 			// If symbol1 is ABS, take attributes from symbol2
+ 			if (!attr)
+ 				*sattr = sattr[1];
+@@ -725,7 +701,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 
+ 		// Unary operators only work on ABS items
+ 		case UNMINUS:
+-//printf("evexpr(): UNMINUS\n");
+ 			if (*sattr & TDB)
+ 				return error(seg_error);
+ 
+@@ -744,7 +719,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case UNLT: // Unary < (get the low byte of a word)
+-//printf("evexpr(): UNLT\n");
+ 			if (*sattr & TDB)
+ 				return error(seg_error);
+ 
+@@ -756,7 +730,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case UNGT: // Unary > (get the high byte of a word)
+-//printf("evexpr(): UNGT\n");
+ 			if (*sattr & TDB)
+ 				return error(seg_error);
+ 
+@@ -768,7 +741,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case '!':
+-//printf("evexpr(): !\n");
+ 			if (*sattr & TDB)
+ 				return error(seg_error);
+ 
+@@ -780,7 +752,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case '~':
+-//printf("evexpr(): ~\n");
+ 			if (*sattr & TDB)
+ 				return error(seg_error);
+ 
+@@ -794,7 +765,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 		// Comparison operators must have two values that
+ 		// are in the same segment, but that's the only requirement.
+ 		case LE:
+-//printf("evexpr(): LE\n");
+ 			sattr--;
+ 			sval--;
+ 
+@@ -824,7 +794,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case GE:
+-//printf("evexpr(): GE\n");
+ 			sattr--;
+ 			sval--;
+ 
+@@ -854,7 +823,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case '>':
+-//printf("evexpr(): >\n");
+ 			sattr--;
+ 			sval--;
+ 
+@@ -884,7 +852,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case '<':
+-//printf("evexpr(): <\n");
+ 			sattr--;
+ 			sval--;
+ 
+@@ -914,7 +881,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case NE:
+-//printf("evexpr(): NE\n");
+ 			sattr--;
+ 			sval--;
+ 
+@@ -944,7 +910,6 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 			break;
+ 
+ 		case '=':
+-//printf("evexpr(): =\n");
+ 			sattr--;
+ 			sval--;
+ 
+@@ -979,14 +944,12 @@ printf("EVEXPR (-): sym1 = %X, sym2 = %X\n", attr, sattr[1]);
+ 		// Shamus: Is this true? There's at least one counterexample of legit
+ 		//         code where this assumption fails to produce correct code.
+ 		default:
+-//printf("evexpr(): default\n");
+ 
+ 			switch ((int)tk.u32[-1])
+ 			{
+ 			case '*':
+ 				sval--;
+ 				sattr--;
+-//printf("--> NxN: %i x %i = ", *sval, sval[1]);
+ 				// Get FLOAT attribute, if any
+ 				attr = (sattr[0] | sattr[1]) & FLOAT;
+ 
+@@ -1009,15 +972,12 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 				{
+ 					*sval *= sval[1];
+ 				}
+-//printf("%i\n", *sval);
+ 
+-//no				*sattr = ABS | DEFINED | attr;		// Expr becomes absolute
+ 				break;
+ 
+ 			case '/':
+ 				sval--;
+ 				sattr--;
+-//printf("--> N/N: %i / %i = ", sval[0], sval[1]);
+ 				// Get FLOAT attribute, if any
+ 				attr = (sattr[0] | sattr[1]) & FLOAT;
+ 
+@@ -1038,7 +998,6 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 				{
+ 					if (sval[1] == 0)
+ 						return error("divide by zero");
+-//printf("--> N/N: %i / %i = ", sval[0], sval[1]);
+ 
+ 					// Compiler is picky here: Without casting these, it
+ 					// discards the sign if dividing a negative # by a
+@@ -1047,9 +1006,7 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 					// ints.
+ 					*sval = (int32_t)sval[0] / (int32_t)sval[1];
+ 				}
+-//printf("%i\n", *sval);
+ 
+-//no				*sattr = ABS | DEFINED | attr;		// Expr becomes absolute
+ 				break;
+ 
+ 			case '%':
+@@ -1063,7 +1020,6 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 					return error("mod (%) by zero");
+ 
+ 				*sval %= sval[1];
+-//no				*sattr = ABS | DEFINED;			// Expr becomes absolute
+ 				break;
+ 
+ 			case SHL:
+@@ -1074,7 +1030,6 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 					return error("floating point numbers not allowed with operator '<<'.");
+ 
+ 				*sval <<= sval[1];
+-//no				*sattr = ABS | DEFINED;			// Expr becomes absolute
+ 				break;
+ 
+ 			case SHR:
+@@ -1085,7 +1040,6 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 					return error("floating point numbers not allowed with operator '>>'.");
+ 
+ 				*sval >>= sval[1];
+-//no				*sattr = ABS | DEFINED;			// Expr becomes absolute
+ 				break;
+ 
+ 			case '&':
+@@ -1096,7 +1050,6 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 					return error("floating point numbers not allowed with operator '&'.");
+ 
+ 				*sval &= sval[1];
+-//no				*sattr = ABS | DEFINED;			// Expr becomes absolute
+ 				break;
+ 
+ 			case '^':
+@@ -1107,7 +1060,6 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 					return error("floating point numbers not allowed with operator '^'.");
+ 
+ 				*sval ^= sval[1];
+-//no				*sattr = ABS | DEFINED;			// Expr becomes absolute
+ 				break;
+ 
+ 			case '|':
+@@ -1118,7 +1070,6 @@ An open question here is do we promote ints to floats as signed or unsigned? It
+ 					return error("floating point numbers not allowed with operator '|'.");
+ 
+ 				*sval |= sval[1];
+-//no				*sattr = ABS | DEFINED;			// Expr becomes absolute
+ 				break;
+ 
+ 			default:
+diff --git a/object.c b/object.c
+index fe10743..57c781e 100644
+--- a/object.c
++++ b/object.c
+@@ -161,6 +161,24 @@ uint8_t * AddSymEntry(register uint8_t * buf, SYM * sym, int globflag)
+ //
+ // Add an entry to the BSD symbol table
+ //
++// From stab.def (https://sites.uclouvain.be/SystInfo/usr/include/bits/stab.def.html):
++/*
++_________________________________________________
++| 00 - 1F are not dbx stab symbols              |
++| In most cases, the low bit is the EXTernal bit|
++
++| 00 UNDEF  | 02 ABS    | 04 TEXT   | 06 DATA   |
++| 01  |EXT  | 03  |EXT  | 05  |EXT  | 07  |EXT  |
++
++| 08 BSS    | 0A INDR   | 0C FN_SEQ | 0E WEAKA  |
++| 09  |EXT  | 0B        | 0D WEAKU  | 0F WEAKT  |
++
++| 10 WEAKD  | 12 COMM   | 14 SETA   | 16 SETT   |
++| 11 WEAKB  | 13        | 15        | 17        |
++
++| 18 SETD   | 1A SETB   | 1C SETV   | 1E WARNING|
++| 19        | 1B        | 1D        | 1F FN     |
++*/
+ uint8_t * AddBSDSymEntry(uint8_t * buf, SYM * sym, int globflag)
+ {
+ 	chptr = buf;						// Point to buffer for depositing longs
+diff --git a/rmac.c b/rmac.c
+index f43b83b..d127525 100644
+--- a/rmac.c
++++ b/rmac.c
+@@ -173,7 +173,7 @@ void DisplayHelp(void)
+ 		"                    o7: clr.l Dx to moveq #0,Dx                       (off)\n"
+ 		"                    o8: adda.w/l #x,Dy to addq.w/l #x,Dy              (off)\n"
+ 		"                    o9: adda.w/l #x,Dy to lea x(Dy),Dy                (off)\n"
+-		"                    op: Enforce PC relative                           (off)\n"
++		"                    op: Enforce PC relative (alternative: o10)        (off)\n"
+ 		"  ~o[value]         Turn a specific optimisation off\n"
+ 		"  +oall             Turn all optimisations on\n"
+ 		"  ~oall             Turn all optimisations off\n"
+-- 
+2.25.0.windows.1
+
