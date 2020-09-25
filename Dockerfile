@@ -124,10 +124,12 @@ RUN \
   git clone http://shamusworld.gotdns.org/git/rmac
 
 COPY rmac.patch rmac
+COPY rmac2.patch rmac
 
 RUN \
   cd rmac && \
   git apply rmac.patch && \
+  git apply rmac2.patch && \
   make && \
   ln -s /home/${USERNAME}/rmac/rmac /home/${USERNAME}/bin/mac
 
