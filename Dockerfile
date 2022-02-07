@@ -132,13 +132,19 @@ RUN \
   ln -s /home/${USERNAME}/rmac/rmac /home/${USERNAME}/bin/mac
 
 RUN \
-  mkdir -p lib
-
-RUN \
   git clone https://github.com/theRemovers/lz77 && \
   cd lz77 && \
   make && \
   ln -s /home/${USERNAME}/lz77/lz77 /home/${USERNAME}/bin/lz77
+
+RUN \
+  git clone https://github.com/theRemovers/3dsconv && \
+  cd 3dsconv && \
+  make && \
+  ln -s /home/${USERNAME}/3dsconv/3dsconv /home/${USERNAME}/bin/3dsconv
+
+RUN \
+  mkdir -p lib
 
 RUN \
   git clone https://github.com/theRemovers/jlibc && \
