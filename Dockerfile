@@ -123,8 +123,11 @@ RUN \
 RUN \
   git clone http://shamusworld.gotdns.org/git/rmac
 
+COPY rmac-0001-Ignore-56k-only-keywords-in-non-56k-modes.patch rmac
+
 RUN \
   cd rmac && \
+  git apply rmac-0001-Ignore-56k-only-keywords-in-non-56k-modes.patch && \
   make && \
   ln -s /home/${USERNAME}/rmac/rmac /home/${USERNAME}/bin/mac
 
