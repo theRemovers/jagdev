@@ -31,6 +31,14 @@ RUN \
     zip
 
 RUN \
+  pacman -Syu --noconfirm \
+    qt5-base \
+    gdb \
+    sdl \
+    libcdio \
+    glu
+
+RUN \
     sed -i 's/# %wheel ALL=(ALL) ALL/%wheel ALL=(ALL) ALL/g'  /etc/sudoers
 
 ARG USERNAME
@@ -86,6 +94,18 @@ USER root
 
 RUN \
   pacman -U --noconfirm m68k-atari-mint-gcc/m68k-atari-mint-gcc*.tar.zst
+
+USER ${USERNAME}
+
+RUN \
+  git clone https://aur.archlinux.org/virtualjaguar-git.git && \
+  cd virtualjaguar-git && \
+  makepkg -f
+
+USER root
+
+RUN \
+  pacman -U --noconfirm virtualjaguar-git/virtualjaguar-git*.tar.zst
 
 WORKDIR /home/${USERNAME}
 
